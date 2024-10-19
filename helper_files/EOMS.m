@@ -78,15 +78,15 @@ function [x, u, xdot, Jx, Ju, consts, Jmat, aug_eoms, u_sol] = EOMS(throttleCons
 
     %Augmented eoms: ydot = [xdot, cdot]' where cdot is the time derivative of the costate vector c
     % Pre-allocate variable sizes
-    cdot = zeros(size(xdot));
-    du = zeros(size(u));
-    u_sol = du;
+    cdot = sym(zeros(size(xdot)));
+    du = sym(zeros(size(u)));
+    u_sol = {};
     
     c = [c1; c2; c3; c4; c5; c6; c7; c8; c9; c10; c11; c12];
     Rmat = [R1 R2 R3 R4; R5 R6 R7 R8; R9 R10 R11 R12; R13 R14 R15 R16];
 
-    L = 0.5 * u' * Rmat * u; %Lagrangian
-    H = L + c' * xdot; %Hamiltonian
+    L = 0.5 * u.' * Rmat * u; %Lagrangian %%% MIGHT NEED NON-CONJUGATE TRANSPOSE
+    H = L + c.' * xdot; %Hamiltonian
     
     for i = 1:12
         cdot(i) = -diff(H, x(i));

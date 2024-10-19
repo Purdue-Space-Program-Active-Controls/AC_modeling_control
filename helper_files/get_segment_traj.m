@@ -37,25 +37,27 @@ B = double(subs(B, [J1 J2 J3; J4 J5 J6; J7 J8 J9], MOI));
 segArray{end + 1} = aug_eoms;
 segArray{end + 1} = u_sol;
 
-%Determine lqr cost functions Q, and R
-if genOn
-    [Q, R, root] = genetic_algorithm(x, A, B, segArray);
-else
+%Generate segment trajectory
+if genOn % GA and 2pbvp
+    [root] = genetic_algorithm(x, A, B, segArray);
+    
+else % old lqr simulation
     Q = diag(Qbry);
     R = diag(Rbry);
-end
 
-%Optimal control gain matrix K, solution S, and poles P
-try
-    [Ksegment, ~, ~] = lqr(A, B, Q, R);
-catch e
-    disp(e.message);
-    error("LQR gain generation threw the error above!");
+
+    %Optimal control gain matrix K, solution S, and poles P
+    try
+        [Ksegment, ~, ~] = lqr(A, B, Q, R);
+    catch e
+        disp(e.message);
+        error("LQR gain generation threw the error above!");
+    end
+        
+    %Simulate using input data
+    %Utilizes dynamics' translational symmetry to approach critical points
+    [xsegment, usegment, tsegment] = simulate(ti, tf, numPoints, Ksegment, constants, MOI, xcrit1-xcrit2, limits);
 end
-    
-%Simulate using input data
-%Utilizes dynamics' translational symmetry to approach critical points
-[xsegment, usegment, tsegment] = simulate(ti, tf, numPoints, Ksegment, constants, MOI, xcrit1-xcrit2, limits);
 
 % Create tracking gains for the simulation
 C = [eye(3), zeros(3, length(A)-3)];
