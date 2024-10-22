@@ -20,9 +20,49 @@ A = double(subs(A, [J1 J2 J3; J4 J5 J6; J7 J8 J9], MOI));
 B = subs(Ju, [x; u; consts], [zeros(length(xcrit2), 1); ucrit2; constants]);
 B = double(subs(B, [J1 J2 J3; J4 J5 J6; J7 J8 J9], MOI));
 
+%Defining quaternion components and angular velocity
+q1 = x(7);
+q2 = x(8);
+q3 = x(9);
+qChange = [q1; q2; q3];
+q0 = sqrt(1 - q1^2 - q2^2 - q3^2);
+q1r = -xcrit2(7);
+q2r = -xcrit2(8);
+q3r = -xcrit2(9);
+qChange_r = [q1r; q2r; q3r];
+q0r = sqrt(1 - q1r^2 - q2r^2 - q3r^2);
+omega = x(10:12);
+
+%Defining required matrices for calculation of correct jacobians
+% delta x = H * xref + G * x
+% H = blkdiag(eye(3),eye(3),q0*eye(3),eye(3)); (not required)
+skewMat = [q0r,-q3r,q2r;
+           q3r, q0r, -q1r;
+           -q2r,q1r,q0r];
+G = blkdiag(-eye(3),-eye(3),skewMat,-eye(3));
+
+Jq0_qv = -1/q0 * (qChange_r * qChange.');
+Jq0dot_qv = -0.5 * (qChange_r * omega.');
+Jq0dot_omega = -0.5 * (qChange_r * qChange.');
+
+DH = blkdiag(zeros(3),zeros(3),Jq0_qv,zeros(3));
+DHdot = [zeros(3),zeros(3),zeros(3),zeros(3);
+         zeros(3),zeros(3),zeros(3),zeros(3);
+         zeros(3),zeros(3),Jq0dot_qv,Jq0dot_omega;
+         zeros(3),zeros(3),zeros(3),zeros(3)];
+
+%Calculate matrices DH DHdot and G
+G = double(subs(G, qChange, xcrit2(7:9)));
+DH = double(subs(DH, qChange, xcrit2(7:9)));
+DHdot = double(subs(DHdot, [qChange,omega], xcrit(7:12)));
+
+%New A and B matrices for delta x dot = f_d(delta x, u)
+Ad = (DHdot + G*A)/(DH + G);
+Bd = G*B;
+
 %Optimal control gain matrix K, solution S, and poles P
 try
-    [Ksegment, ~, ~] = lqr(A, B, Q, R);
+    [Ksegment, ~, ~] = lqr(Ad, Bd, Q, R);
 catch e
     disp(e.message);
     error("LQR gain generation threw the error above!");
